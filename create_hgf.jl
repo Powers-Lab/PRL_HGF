@@ -1,4 +1,14 @@
 
+#### IF YOU NEED TO USE THIS DOC IN A NEW ENVIRONMENT:
+
+cd("C:/Users/maxsu/DataAnalysis/julia_hgf") #cd to directory with the correct project.toml and manifest.toml
+Pkg.activate(".") #activate environment in current directory (assuming we're in above directory)
+Pkg.instantiate() #ensures all correct packages and dependencies in .tomls are installed
+include("create_hgf.jl")  # Make sure this is the correct path to your script
+
+
+## load libraries 
+
 using HierarchicalGaussianFiltering
 using ActionModels
 using StatsPlots

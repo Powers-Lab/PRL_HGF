@@ -757,6 +757,8 @@ version = "2.8.1+1"
 [[deps.HierarchicalGaussianFiltering]]
 deps = ["ActionModels", "Distributions", "RecipesBase"]
 git-tree-sha1 = "4a9e68d92ed639f4c62b9835dbe1da19e2463cca"
+repo-rev = "main"
+repo-url = "https://github.com/ilabcode/HierarchicalGaussianFiltering.jl"
 uuid = "63d42c3e-681c-42be-892f-a47f35336a79"
 version = "0.5.1"
 

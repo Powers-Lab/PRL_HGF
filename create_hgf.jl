@@ -6,8 +6,8 @@ Pkg.activate(".") #activate environment in current directory (assuming we're in 
 Pkg.instantiate() #ensures all correct packages and dependencies in .tomls are installed
 include("create_hgf.jl")  # Make sure this is the correct path to your script
 
-
 ## load libraries 
+Pkg.add(url="https://github.com/ilabcode/HierarchicalGaussianFiltering.jl")
 
 using HierarchicalGaussianFiltering
 using ActionModels
@@ -16,7 +16,6 @@ using Distributions
 using Turing
 
 ######## CREATE HGF ######
-
 config = Dict()
 
 #Defaults

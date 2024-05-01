@@ -12,7 +12,7 @@ Pkg.activate(".") #activate environment in current directory (assuming we're in 
 
 using HierarchicalGaussianFiltering
 using ActionModels
-#using StatsPlots
+using StatsPlots
 using Distributions
 using Turing
 
@@ -185,7 +185,7 @@ reset!(hgf)
 give_inputs!(hgf, inputs)
 
 #Plot belief trajectory for the HGF
-#plot_trajectory(hgf, "xprob3")
+plot_trajectory(hgf, "xprob3")
 
 
 
@@ -196,7 +196,8 @@ give_inputs!(hgf, inputs)
 #Softmax function
 function softmax(x::AbstractVector, inv_temp::Real)
     exp_values = exp.(x * inv_temp)
-    return exp_values / sum(exp_values)
+    prob_values = exp_values / sum(exp_values)
+    return prob_values
 end
 
 #Action model function
@@ -228,6 +229,16 @@ function choose_bandit(agent::Agent, input::Any)
 
     #Run them through the softmax
     action_proabilities = softmax(predicted_probabilities, β)
+
+    #If the probabilities became NaN
+    if any(isnan, action_proabilities)
+        #Throw an error that will reject samples when fitted
+        throw(
+            RejectParameters(
+                "With these parameters and inputs, the probabilities became NaN, which is invalid. Try other parameter settings",
+            ),
+        )
+    end
 
     #Return a Categorical probability distribution
     action_distribution = Categorical(action_proabilities)
@@ -268,7 +279,7 @@ inputs = [
 simulated_actions = give_inputs!(agent,inputs)
 
 #Plot belief trajectories
-# plot_trajectory(agent, "xbin1")
+plot_trajectory(agent, "xbin1")
 
 
 #### SIMULARTING TO SEE WAHT HAPPENS WITH DIFFERENT PARAMETER SETTINGS ####
@@ -280,7 +291,8 @@ init_choice = rand(Categorical([1/3, 1/3, 1/3]))
 initial_obs = rand(Bernoulli(true_probs[init_choice]))
 next_input = (init_choice,initial_obs)
 #Set agent parameters
-set_parameters!(agent, Dict("softmax_precision" => 0.5))
+set_parameters!(agent, Dict("softmax_precision" => 4,
+                            "xprob_volatility" => -2,))
 reset!(agent)
 
 #Save the inputs
@@ -307,10 +319,10 @@ end
 pop!(inputs)
 
 #Plot
-# plot_trajectory(agent, "action")
-# plot_trajectory(agent, "xbin1")
-# plot_trajectory(agent, "xbin2")
-# plot_trajectory(agent, "action")
+plot_trajectory(agent, "action")
+plot_trajectory(agent, "xbin1")
+plot_trajectory(agent, "xbin2")
+plot_trajectory(agent, "action")
 
 # length(inputs)
 # length(simulated_actions)
@@ -324,10 +336,9 @@ pop!(inputs)
 
 #Set priors
 priors = Dict(
-    "xprob_volatility" => Normal(0, 1),
-    "softmax_precision" => truncated(  Normal(0.5, 1),  lower = 0, upper = 2),
+    "xprob_volatility" => Normal(-4, 1),
+    "softmax_precision" => truncated(  Normal(2, 2),  lower = 0),
 )
-
 
 results = fit_model(agent, 
                     priors, 
@@ -337,35 +348,37 @@ results = fit_model(agent,
                     n_iterations = 1000,
                     n_chains = 2)
 
+plot(results)
+plot_parameter_distribution(results, priors)
+
+get_posteriors(results)
 
 
 ### PARAMETER ESTIMATION FOR FULL DATASET ###
 
-results = fit_model(
-    agent, 
-    priors, 
-    data;
+# results = fit_model(
+#     agent, 
+#     priors, 
+#     data;
 
-    independent_group_cols = [:record_id],
-    input_cols = [:prev_chosen_bandit, :prev_reward],
-    action_cols = [:chosen_bandit],
+#     independent_group_cols = [:record_id],
+#     input_cols = [:prev_chosen_bandit, :prev_reward],
+#     action_cols = [:chosen_bandit],
 
-    #n_cores = 4,
-    n_chains = 2,
-    n_iterations = 1000,
-    sampler = NUTS(),
-)
+#     #n_cores = 4,
+#     n_chains = 2,
+#     n_iterations = 1000,
+#     sampler = NUTS(),
+# )
 
 
 #ON ONE TRIAL:
 #THE INPUT IS: MY PREVIOUS CHOICE AND PREVIOUS REWARD
 #THE ACTION IS: MY NEW CHOICE
 
-using StatsPlots
 
-
-### PLOTTING
 
 ### PARALLELIZATION
+### RUN IT ON THE WHOLE THING
 
 

@@ -1,17 +1,18 @@
 
 #### IF YOU NEED TO USE THIS DOC IN A NEW ENVIRONMENT:
 
-cd("C:/Users/maxsu/DataAnalysis/julia_hgf") #cd to directory with the correct project.toml and manifest.toml
+#cd("C:/Users/maxsu/DataAnalysis/julia_hgf") #cd to directory with the correct project.toml and manifest.toml
 Pkg.activate(".") #activate environment in current directory (assuming we're in above directory)
-Pkg.instantiate() #ensures all correct packages and dependencies in .tomls are installed
-include("create_hgf.jl")  # Make sure this is the correct path to your script
+#Pkg.instantiate() #ensures all correct packages and dependencies in .tomls are installed
+#include("create_hgf.jl")  # Make sure this is the correct path to your script
 
 ## load libraries 
-Pkg.add(url="https://github.com/ilabcode/HierarchicalGaussianFiltering.jl")
+# Pkg.add(url="https://github.com/ilabcode/HierarchicalGaussianFiltering.jl")
+# Pkg.add(url="https://github.com/ilabcode/ActionModels.jl")
 
 using HierarchicalGaussianFiltering
 using ActionModels
-using StatsPlots
+#using StatsPlots
 using Distributions
 using Turing
 
@@ -184,7 +185,7 @@ reset!(hgf)
 give_inputs!(hgf, inputs)
 
 #Plot belief trajectory for the HGF
-plot_trajectory(hgf, "xprob3")
+#plot_trajectory(hgf, "xprob3")
 
 
 
@@ -193,8 +194,8 @@ plot_trajectory(hgf, "xprob3")
 ### CREATE AGENT ###
 
 #Softmax function
-function softmax(x::AbstractVector, temp::Real)
-    exp_values = exp.(x / temp)
+function softmax(x::AbstractVector, inv_temp::Real)
+    exp_values = exp.(x * inv_temp)
     return exp_values / sum(exp_values)
 end
 
@@ -222,8 +223,8 @@ function choose_bandit(agent::Agent, input::Any)
     #Get the predicted probabilites for reqards for each of the bandits
     predicted_probabilities = [hgf.ordered_nodes.input_nodes[i].edges.observation_parents[1].states.prediction_mean for i in 1:length(hgf.input_nodes)]
 
-    #Get the temperature parameter
-    β = agent.parameters["softmax_temperature"]
+    #Get the precision parameter
+    β = agent.parameters["softmax_precision"]
 
     #Run them through the softmax
     action_proabilities = softmax(predicted_probabilities, β)
@@ -235,7 +236,7 @@ function choose_bandit(agent::Agent, input::Any)
 end
 
 #Add the temeprature parmaeter for the action model
-parameters = Dict("softmax_temperature" => 1)
+parameters = Dict("softmax_precision" => 1)
 
 #create the agent
 agent = init_agent(
@@ -251,7 +252,7 @@ agent = init_agent(
 get_parameters(agent)
 
 #Set parameters
-set_parameters!(agent, Dict("softmax_temperature" => 0.1))
+set_parameters!(agent, Dict("softmax_precision" => 0.1))
 reset!(agent)
 
 #"real inputs"
@@ -267,48 +268,104 @@ inputs = [
 simulated_actions = give_inputs!(agent,inputs)
 
 #Plot belief trajectories
-plot_trajectory(agent, "xbin2")
+# plot_trajectory(agent, "xbin1")
 
 
-#### SIMULARTING TO SEE WAHT HAPPENS WITH DIFFERENT PARAMETER SETTINGS
+#### SIMULARTING TO SEE WAHT HAPPENS WITH DIFFERENT PARAMETER SETTINGS ####
 
-true_probs = [0.2, 0.2, 0.8]
+#Set true probs
+true_probs = [0.1, 0.1, 0.9]
+#Set initial choice
+init_choice = rand(Categorical([1/3, 1/3, 1/3]))
+initial_obs = rand(Bernoulli(true_probs[init_choice]))
+next_input = (init_choice,initial_obs)
+#Set agent parameters
+set_parameters!(agent, Dict("softmax_precision" => 0.5))
+reset!(agent)
 
-next_input = (3,1)
+#Save the inputs
+inputs = []
+simulated_actions = []
 
-for i = 1:5
+push!(inputs, next_input)
+#Simulate
+for i = 1:100
+    #Update HGF and generate action
     action = single_input!(agent, next_input)
 
+    #generate new observation based on action
     new_observation = rand(Bernoulli(true_probs[action]))
 
+    #Save the next input as the action and the observation
     next_input = (action, new_observation)
+
+    push!(simulated_actions, action)
+    push!(inputs, next_input)
 end
+
+#remove the last input
+pop!(inputs)
+
+#Plot
+# plot_trajectory(agent, "action")
+# plot_trajectory(agent, "xbin1")
+# plot_trajectory(agent, "xbin2")
+# plot_trajectory(agent, "action")
+
+# length(inputs)
+# length(simulated_actions)
+
 
 
 
 ### PARAMETER ESTIMATION FOR SINGLE PARTICIPANT ###
 
+#agent is already defined
 
-# priors = Dict(
-#     "xprob_volatility" => Normal(0, 1),
-#     #"softmax_temperature" => truncated(Normal(0, 1),lower = 0),
-# )
+#Set priors
+priors = Dict(
+    "xprob_volatility" => Normal(0, 1),
+    "softmax_precision" => truncated(  Normal(0.5, 1),  lower = 0, upper = 2),
+)
 
-# results = fit_model(agent, priors, inputs, simulated_actions)
+
+results = fit_model(agent, 
+                    priors, 
+                    inputs, 
+                    simulated_actions;
+                    sampler = NUTS(),
+                    n_iterations = 1000,
+                    n_chains = 2)
 
 
 
 ### PARAMETER ESTIMATION FOR FULL DATASET ###
 
-# results = fit_model(
-#     agent, 
-#     priors, 
-#     data;
-#     independent_group_cols = [:ID],
-#     input_cols = [:prev_chosen_bandit, :reward],
-#     action_cols = [:chosen_bandit],
-#     n_cores = 4,
-#     n_chains = 2,
-#     n_iterations = 1000
-# )
+results = fit_model(
+    agent, 
+    priors, 
+    data;
+
+    independent_group_cols = [:record_id],
+    input_cols = [:prev_chosen_bandit, :prev_reward],
+    action_cols = [:chosen_bandit],
+
+    #n_cores = 4,
+    n_chains = 2,
+    n_iterations = 1000,
+    sampler = NUTS(),
+)
+
+
+#ON ONE TRIAL:
+#THE INPUT IS: MY PREVIOUS CHOICE AND PREVIOUS REWARD
+#THE ACTION IS: MY NEW CHOICE
+
+using StatsPlots
+
+
+### PLOTTING
+
+### PARALLELIZATION
+
 

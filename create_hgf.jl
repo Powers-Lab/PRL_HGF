@@ -1,7 +1,23 @@
 
 #### IF YOU NEED TO USE THIS DOC IN A NEW ENVIRONMENT:
+### Initialize Environment and instantiate based on .toml
+import Pkg
+cd("C:/Users/maxsu/DataAnalysis/julia_hgf") #cd to directory with the correct project.toml and manifest.toml
+Pkg.activate(".") #activate environment in current directory (assuming we're in above directory)
+Pkg.instantiate() #ensures all correct packages and dependencies in .tomls are installed
+# include("create_hgf.jl")  # Use all of the functions and whatnot that Peter created
 
-#cd("C:/Users/maxsu/DataAnalysis/julia_hgf") #cd to directory with the correct project.toml and manifest.toml
+### Load libraries
+using HierarchicalGaussianFiltering
+using ActionModels
+using StatsPlots
+using Distributions
+using Turing
+using CSV
+using DataFrames
+using Plots
+
+# cd("C:/Users/maxsu/DataAnalysis/julia_hgf") #cd to directory with the correct project.toml and manifest.toml
 Pkg.activate(".") #activate environment in current directory (assuming we're in above directory)
 #Pkg.instantiate() #ensures all correct packages and dependencies in .tomls are installed
 #include("create_hgf.jl")  # Make sure this is the correct path to your script
@@ -285,7 +301,10 @@ plot_trajectory(agent, "xbin1")
 #### SIMULARTING TO SEE WAHT HAPPENS WITH DIFFERENT PARAMETER SETTINGS ####
 
 #Set true probs
-true_probs = [0.1, 0.1, 0.9]
+true_probs = [
+    [0.1, 0.1, 0.9],
+
+    ]
 #Set initial choice
 init_choice = rand(Categorical([1/3, 1/3, 1/3]))
 initial_obs = rand(Bernoulli(true_probs[init_choice]))
@@ -304,6 +323,9 @@ push!(inputs, next_input)
 for i = 1:100
     #Update HGF and generate action
     action = single_input!(agent, next_input)
+    # println("Current trial index: $i")
+    # println("Action chosen: $action")
+    # println("Probability used for Bernoulli: $(true_probs[i][action])")
 
     #generate new observation based on action
     new_observation = rand(Bernoulli(true_probs[action]))
